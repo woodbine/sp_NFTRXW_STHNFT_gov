@@ -50,7 +50,7 @@ def validateURL(url):
         else:
             ext = os.path.splitext(url)[1]
         validURL = r.getcode() == 200
-        validFiletype = ext.lower() in ['.csv', '.xls', '.xlsx', '.pdf', '.xlt']
+        validFiletype = ext.lower() in ['.csv', '.xls', '.xlsx', '.pdf', '.xlt', '.zip']
         return validURL, validFiletype
     except:
         print ("Error validating URL.")
@@ -85,7 +85,7 @@ def convert_mth_strings ( mth_string ):
 #### VARIABLES 1.0
 
 entity_id = "NFTRXW_STHNFT_gov"
-url = "https://data.gov.uk/dataset/financial-transactions-data-the-shrewsbury-and-telford-hospital-nhs-trust"
+url = "http://www.sath.nhs.uk/about-us/Expenditure_over_25K.aspx"
 errors = 0
 data = []
 
@@ -99,18 +99,18 @@ soup = BeautifulSoup(html, 'lxml')
 
 #### SCRAPE DATA
 
-blocks = soup.find_all('div', 'dropdown')
+blocks = soup.find_all('a')
 for block in blocks:
-    file_url = ''
-    try:
-        file_url = block.find('ul', 'dropdown-menu').find_all('li')[1].find('a')['href']
-    except:
-        pass
-    if '.csv' in file_url or '.xls' in file_url:
-        url = file_url
-        title = block.find_previous('div', 'dataset-resource-text').text.strip()
-        csvMth = title.split('-')[-1].strip()[:3]
-        csvYr = title.split('-')[-1].strip()[-4:]
+    if '.csv' in block['href'] or '.xls' in block['href'] or '.xlsx' in block['href'] or '.zip' in block['href']:
+        url = 'http://www.sath.nhs.uk'+block['href']
+        title = block.text.strip()
+        csvMth = title.split()[0].strip()[:3]
+        csvYr = title.split()[-1].strip()[-4:]
+        if ']' in csvYr:
+            csvMth = title.split()[0][:3]
+            csvYr = title.split()[1]
+        if 'y' in csvMth:
+            csvMth = 'May'
         csvMth = convert_mth_strings(csvMth.upper())
         data.append([csvYr, csvMth, url])
 
