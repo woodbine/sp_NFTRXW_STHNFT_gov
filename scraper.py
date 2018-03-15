@@ -9,7 +9,12 @@ import urllib2
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-#### FUNCTIONS 1.0
+#### FUNCTIONS 1.1
+import ssl
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import requests
+
 
 def validateFilename(filename):
     filenameregex = '^[a-zA-Z0-9]+_[a-zA-Z0-9]+_[a-zA-Z0-9]+_[0-9][0-9][0-9][0-9]_[0-9QY][0-9]$'
@@ -37,25 +42,24 @@ def validateFilename(filename):
 
 def validateURL(url):
     try:
-        r = urllib2.urlopen(url)
+
+        r = requests.get(url, verify=False)
         count = 1
-        while r.getcode() == 500 and count < 4:
+        while r.status_code == 500 and count < 4:
             print ("Attempt {0} - Status code: {1}. Retrying.".format(count, r.status_code))
             count += 1
-            r = urllib2.urlopen(url)
+            r = requests.get(url, verify=False)
         sourceFilename = r.headers.get('Content-Disposition')
-
         if sourceFilename:
             ext = os.path.splitext(sourceFilename)[1].replace('"', '').replace(';', '').replace(' ', '')
         else:
             ext = os.path.splitext(url)[1]
-        validURL = r.getcode() == 200
+        validURL = r.status_code == 200
         validFiletype = ext.lower() in ['.csv', '.xls', '.xlsx', '.pdf', '.xlt', '.zip']
         return validURL, validFiletype
     except:
         print ("Error validating URL.")
         return False, False
-
 
 
 def validate(filename, file_url):
@@ -85,24 +89,28 @@ def convert_mth_strings ( mth_string ):
 #### VARIABLES 1.0
 
 entity_id = "NFTRXW_STHNFT_gov"
-url = "http://www.sath.nhs.uk/about-us/Expenditure_over_25K.aspx"
+url = "https://www.sath.nhs.uk/about-us/freedom-of-information/expenditure-over-25-000/"
 errors = 0
 data = []
 
 
 #### READ HTML 1.0
 
-
-html = urllib2.urlopen(url)
+req = urllib2.Request(url)
+gcontext = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+html = urllib2.urlopen(req, context=gcontext)
 soup = BeautifulSoup(html, 'lxml')
 
 
 #### SCRAPE DATA
 
-blocks = soup.find_all('a')
+blocks = soup.find('div', 'tab-content').find_all('a')
 for block in blocks:
     if '.csv' in block['href'] or '.xls' in block['href'] or '.xlsx' in block['href'] or '.zip' in block['href']:
-        url = 'http://www.sath.nhs.uk'+block['href']
+        if 'http' not in block['href']:
+            url = 'https://www.sath.nhs.uk'+block['href']
+        else:
+            url = block['href']
         title = block.text.strip()
         csvMth = title.split()[0].strip()[:3]
         csvYr = title.split()[-1].strip()[-4:]
@@ -111,6 +119,8 @@ for block in blocks:
             csvYr = title.split()[1]
         if 'y' in csvMth:
             csvMth = 'May'
+        if '1' in csvYr or '2' in csvYr and len(csvYr)==1:
+            csvYr = title.split()[1]
         csvMth = convert_mth_strings(csvMth.upper())
         data.append([csvYr, csvMth, url])
 
